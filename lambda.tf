@@ -23,12 +23,12 @@ data "aws_iam_policy_document" "iam_lambda_service" {
 }
 
 resource "aws_iam_policy" "lambda_role_policy" {
-  name   = "lambda_role_policy"
+  name   = "fantasy_lambda_role_policy"
   policy = data.aws_iam_policy_document.policy_data.json
 }
 
 resource "aws_iam_role" "lambda_role" {
-  name               = "lambda_role"
+  name               = "fantasy_lambda_role"
   assume_role_policy = data.aws_iam_policy_document.iam_lambda_service.json
 }
 

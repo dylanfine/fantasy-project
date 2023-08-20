@@ -24,7 +24,7 @@ data "aws_iam_policy_document" "push_layers_to_s3" {
 }
 
 resource "aws_iam_policy" "push_layers_to_s3" {
-  name   = "push-layers-to-s3"
+  name   = "push-fantasy-layers-to-s3"
   policy = data.aws_iam_policy_document.push_layers_to_s3.json
 }
 

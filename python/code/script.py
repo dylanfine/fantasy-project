@@ -5,6 +5,11 @@ import re
 import boto3
 from botocore.exceptions import ClientError
 from pretty_html_table import build_table
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
+from io import StringIO
 
 ENDPOINT_URL = 'https://www.bovada.lv/services/sports/event/coupon/events/A/description/football/nfl-season-player-props/season-player-specials?marketFilterId=rank&preMatchOnly=true&eventsLimit=5000&lang=en'
 
@@ -64,52 +69,45 @@ def extract_player_stat(line: str) -> tuple:
         return match.group('name'), match.group('stat')
     return None
 
-def send_email(html):
-    SENDER = "Financial Analysis <dylanjfine@gmail.com>"
-    RECIPIENT = "dylanjfine@gmail.com"
-    AWS_REGION = "us-east-2"
-    SUBJECT = "Your Daily Financial Summary"
-    # Text value only shows up if HTML fails - otherwise text needs to be put in the HTML
-    BODY_TEXT = "Your email client cannot support HTML"
-    BODY_HTML = html
-    CHARSET = "UTF-8"
-    client = boto3.client("ses", region_name=AWS_REGION)
-    try:
-        # Provide the contents of the email.
-        response = client.send_email(
-            ConfigurationSetName="email_open",
-            Destination={
-                "ToAddresses": [
-                    RECIPIENT,
-                ],
-            },
-            Message={
-                "Body": {
-                    "Html": {
-                        "Charset": CHARSET,
-                        "Data": BODY_HTML,
-                    },
-                    "Text": {
-                        "Charset": CHARSET,
-                        "Data": BODY_TEXT,
-                    },
-                },
-                "Subject": {
-                    "Charset": CHARSET,
-                    "Data": SUBJECT,
-                },
-            },
-            Source=SENDER,
-        )
-    # Display an error if something goes wrong.
-    except ClientError as e:
-        print(e.response["Error"]["Message"])
-    else:
-        print("Email sent! Message ID:"),
-        print(response["MessageId"])
+def send_dataframe_as_attachment(html,df, filename="data.csv"):
+    SUBJECT =  "Your Daily Fantasy Magic"
+    SENDER = "Fantasy Greatness <dylanjfine@gmail.com>"
+    RECEIPEINTS = 'dylanjfine@gmail.com'
+
+    # Convert DataFrame to CSV string
+    csv_buffer = StringIO()
+    df.to_csv(csv_buffer)
+
+    # Create a new SES client
+    client = boto3.client('ses')
+
+    # Create a multipart/mixed parent container
+    msg = MIMEMultipart('mixed')
+    msg['Subject'] = SUBJECT
+
+    # Add the HTML message part
+    text_part = MIMEText(html, 'html')
+    msg.attach(text_part)
+
+    # Add the CSV attachment
+    att = MIMEBase('application', 'octet-stream')
+    att.set_payload(csv_buffer.getvalue())
+    encoders.encode_base64(att)
+    att.add_header('Content-Disposition', 'attachment', filename=filename)
+    msg.attach(att)
+
+    # Send the email
+    response = client.send_raw_email(
+        Source=SENDER,
+        Destinations=[RECEIPEINTS],
+        RawMessage={'Data': msg.as_string()}
+    )
+    
+    return response
 
 def lambda_handler(event,context):
-    data = requests.get(ENDPOINT_URL).json()
+    headers = headers_to_json(headers_string)
+    data = requests.get(ENDPOINT_URL,headers=headers).json()
 
     lst = []
     for event in data[0]['events']:
