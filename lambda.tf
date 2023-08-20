@@ -67,10 +67,6 @@ resource "aws_lambda_layer_version" "lambda_layer" {
   source_code_hash    = data.aws_s3_object.layers_zip.metadata.Hash
 }
 
-# https://stackoverflow.com/questions/55052153/how-to-configure-environment-variables-in-hashicorp-terraform
-# run export TF_VAR_email_pw={PASSWORD}
-variable "email_pw" {}
-
 resource "aws_lambda_function" "financial_analysis" {
 
   filename         = data.archive_file.zip_lambda.output_path
@@ -85,8 +81,6 @@ resource "aws_lambda_function" "financial_analysis" {
   environment {
     variables = {
       DEV_MODE = "production",
-      EMAIL_PW = var.email_pw
-
     }
   }
 }

@@ -1,0 +1,47 @@
+# This workflow will install dependencies and create a build suitable
+# to be used in an AWS Lambda Layer.  The build will then be uploaded
+# to S3 and then can be accessed from any lambda that uses the layer.
+
+name: Build Lambda Layer
+
+on:
+  push:
+    paths:
+      - .github/workflows/layers.yml
+      - python/layers/requirements.txt
+
+jobs:
+  deploy:
+    name: Upload Layer to AWS Lambda
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      # For more info: https://github.com/aws-actions/configure-aws-credentials
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{secrets.access_key}}
+          aws-secret-access-key: ${{secrets.secret}}
+          aws-region: ${{secrets.REGION}}
+
+      - name: Setup Python 3.8
+        uses: actions/setup-python@v1
+        with:
+          python-version: 3.8
+
+      - name: Zip it all up and upload to S3
+        env:
+          zip_name: lambda_deployment.zip
+        run: |
+          cd python/layers
+          docker run --rm \
+            --volume=$(pwd):/lambda-build \
+            -w=/lambda-build \
+            lambci/lambda:build-python3.8 \
+            pip install -r requirements.txt --target python 
+          zip -r $zip_name python 
+          lambdahash=$(openssl dgst -binary -sha256 lambda_deployment.zip | openssl base64)     
+          aws s3 cp $zip_name s3://dylan-andrew-fantasy-project/layers/ --metadata hash=$lambdahash
