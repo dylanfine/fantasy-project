@@ -1,0 +1,8 @@
+setup/
+**credentials**
+**/.terraform/**
+setup/.terraform.lock.hcl
+python/zips/**
+.vscode/**
+.ipynb_checkpoints/**
+Sandbox.ipynb

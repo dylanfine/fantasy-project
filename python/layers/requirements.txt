@@ -1,0 +1,4 @@
+pandas
+requests
+s3fs
+pretty_html_table
