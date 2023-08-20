@@ -146,4 +146,4 @@ def lambda_handler(event,context):
         f"""<body><h1>See fantasy data below!!</h1></body>"""
         + build_table(df, color="green_light")
     )
-    send_email(html)
+    send_dataframe_as_attachment(html,df)
