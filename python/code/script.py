@@ -72,7 +72,7 @@ def extract_player_stat(line: str) -> tuple:
 def send_dataframe_as_attachment(html,df, filename="data.csv"):
     SUBJECT =  "Your Daily Fantasy Magic"
     SENDER = "Fantasy Greatness <dylanjfine@gmail.com>"
-    RECEIPEINTS = 'dylanjfine@gmail.com'
+    RECEIPEINTS = ['dylanjfine@gmail.com','andrewboppart@gmail.com']
 
     # Convert DataFrame to CSV string
     csv_buffer = StringIO()
@@ -99,7 +99,7 @@ def send_dataframe_as_attachment(html,df, filename="data.csv"):
     # Send the email
     response = client.send_raw_email(
         Source=SENDER,
-        Destinations=[RECEIPEINTS],
+        Destinations=RECEIPEINTS,
         RawMessage={'Data': msg.as_string()}
     )
     
