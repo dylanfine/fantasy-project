@@ -1,4 +1,5 @@
 setup/
+nfl_fantasy.ipynb
 **credentials**
 **/.terraform/**
 setup/.terraform.lock.hcl
