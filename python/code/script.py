@@ -10,6 +10,8 @@ from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
 from io import StringIO
+import urllib.parse
+import datetime as dt
 
 ENDPOINT_URL = "https://www.bovada.lv/services/sports/event/coupon/events/A/description/football/nfl-season-player-props/season-player-specials?marketFilterId=rank&preMatchOnly=true&eventsLimit=5000&lang=en"
 
@@ -89,44 +91,94 @@ def send_dataframe_as_attachment(html, df, filename="data.csv"):
     return response
 
 
-def lambda_handler(event, context):
-    headers = headers_to_json(headers_string)
+def extract_date(date_string):
+    d = dt.datetime.strptime(date_string, "%Y-%m-%dT%H:%M:%S.%fZ")
+    d = d - dt.timedelta(hours=7)
+    return str(d.date())
 
+
+def get_digitalsports_df():
     url = "https://bv2.digitalsportstech.com/api/game?sb=bovada&league=142"
     r = requests.get(url)
-    game_ids = [
-        provider["id"]
+    game_ids_and_dates = [
+        (provider["id"], item["date"])
         for item in r.json()
         for provider in item["providers"]
         if provider["name"] == "nix"
     ]
     lst = []
-    for game_id in game_ids:
+    for game_id, date in game_ids_and_dates:
         market_url = f"https://bv2.digitalsportstech.com/api/grouped-markets/v2/categories?sb=bovada&gameId={game_id}&sgmOdds=true"
         res = requests.get(market_url).json()
         over_unders = res["ou"]
         for ou_cat in over_unders:
             stat_url = f"https://bv2.digitalsportstech.com/api/dfm/marketsByOu?sb=bovada&gameId={game_id}&statistic={urllib.parse.quote(ou_cat)}"
             res = requests.get(stat_url).json()
-            lst.append(res)
+            for player in res[0]["players"]:
+                d = {}
+                d["source"] = "digitalsportstech"
+                d["player"] = player["name"]
+                d["team"] = player["team"]
+                d["game_date"] = extract_date(date)
+                d["stat"] = ou_cat
+                for market in player["markets"]:
+                    if market["condition"] == 1:
+                        d["under_line"] = market["value"]
+                        d["under_odds"] = market["odds"]
+                    elif market["condition"] == 3:
+                        d["over_line"] = market["value"]
+                        d["over_odds"] = market["odds"]
+                lst.append(d)
 
-    df_lst = []
-    for cat in lst:
-        for player in cat[0]["players"]:
-            d = {}
-            d["player"] = player["name"]
-            d["team"] = player["team"]
-            d["stat"] = cat[0]["statistic"]
-            for market in player["markets"]:
-                if market["condition"] == 1:
-                    d["under_line"] = market["value"]
-                    d["under_odds"] = market["odds"]
-                elif market["condition"] == 3:
-                    d["over_line"] = market["value"]
-                    d["over_odds"] = market["odds"]
-            df_lst.append(d)
+        df = pd.DataFrame(lst)
+        return df
 
-    df = pd.DataFrame(df_lst)
+
+def get_bovada_df():
+    b_url = "https://www.bovada.lv/services/sports/event/coupon/events/A/description/football/nfl?lang=en"
+
+    headers = headers_to_json(headers_string)
+    d = requests.get(b_url, headers=headers)
+    res = d.json()
+    bovada_lst = []
+    for event in res[0]["events"]:
+        game_date = dt.datetime.fromtimestamp(event["startTime"] / 1000).date()
+        display_groups = event["displayGroups"]
+        for display_group in display_groups:
+            display_group_description = display_group["description"]
+            if display_group_description not in [
+                "Receiving Props",
+                "QB Props",
+                "Rushing Props",
+            ]:
+                continue
+            for market in display_group["markets"]:
+                market_description = market["description"]
+                stat = market_description.split("-")[0].strip()
+                player = market_description.split("-")[1].strip()
+
+                d = {}
+                d["source"] = "bovada"
+                d["game_date"] = str(game_date)
+                d["player"] = player
+                d["stat"] = stat
+                for outcome in market["outcomes"]:
+                    if outcome["description"] == "Over":
+                        d["over_line"] = outcome["price"]["handicap"]
+                        d["over_odds"] = outcome["price"]["decimal"]
+                    elif outcome["description"] == "Under":
+                        d["under_line"] = outcome["price"]["handicap"]
+                        d["under_odds"] = outcome["price"]["decimal"]
+                bovada_lst.append(d)
+    bovada_df = pd.DataFrame(bovada_lst)
+    return bovada_df
+
+
+def lambda_handler(event, context):
+    ds_df = get_digitalsports_df()
+    bovada_df = get_bovada_df()
+
+    df = pd.concat([ds_df, bovada_df], ignore_index=True)
 
     html = f"""<body><h1>See fantasy data below!!</h1></body>""" + build_table(
         df, color="green_light"
