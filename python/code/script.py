@@ -12,6 +12,7 @@ from email import encoders
 from io import StringIO
 import urllib.parse
 import datetime as dt
+from collections import Counter
 
 ENDPOINT_URL = "https://www.bovada.lv/services/sports/event/coupon/events/A/description/football/nfl-season-player-props/season-player-specials?marketFilterId=rank&preMatchOnly=true&eventsLimit=5000&lang=en"
 
@@ -130,8 +131,8 @@ def get_digitalsports_df():
                         d["over_odds"] = market["odds"]
                 lst.append(d)
 
-        df = pd.DataFrame(lst)
-        return df
+    df = pd.DataFrame(lst)
+    return df
 
 
 def get_bovada_df():
@@ -174,11 +175,95 @@ def get_bovada_df():
     return bovada_df
 
 
+def determine_position(text):
+    # Convert text to lowercase and split into words
+    text = text.lower()
+    words = text.split()
+    word_freq = Counter(words)
+
+    # Define positions and their respective keywords
+    positions = {
+        "Quarterback": ["quarterback"],
+        "Wide Receiver": ["wide", "receiver"],
+        "Running Back": ["running", "back"],
+        "Tight End": ["tight", "end"],
+    }
+
+    # Calculate the average count for each position
+    position_counts = {}
+    for position, keywords in positions.items():
+        position_counts[position] = sum(
+            word_freq[keyword] for keyword in keywords
+        ) / len(keywords)
+
+    # Find the position with the highest average count
+    max_position = max(position_counts, key=position_counts.get)
+
+    # Check if there's a tie (ambiguous position)
+    max_count = position_counts[max_position]
+    ambiguous = sum(1 for count in position_counts.values() if count == max_count) > 1
+
+    if ambiguous:
+        return "Ambiguous"
+    elif max_count == 0:
+        return "Position not found"
+    else:
+        return max_position
+
+
+def google_search(query):
+    endpoint = "https://www.googleapis.com/customsearch/v1"
+    params = {
+        "key": "AIzaSyDUUCLq25mNPGu9Uu5FQlz8vg0ODZ37-W0",
+        "cx": "a25cab0483abd48b2",
+        "q": query,
+    }
+
+    response = requests.get(endpoint, params=params)
+    return response.json()
+
+
+def update_json(df, json_file):
+    df["position"] = df.player.map(json_file).fillna("Unknown")
+
+    search_players = df.loc[(df.position == "Ambiguous") | (df.position == "Unknown")]
+
+    for player in search_players.player.unique():
+        print(player)
+        result = google_search(f"What position does {player} play in the NFL?")
+        json_file[player] = determine_position(str(result).lower())
+        print(json_file[player])
+        print("")
+
+    return json_file
+
+
 def lambda_handler(event, context):
+    s3 = boto3.client("s3")
+
     ds_df = get_digitalsports_df()
     bovada_df = get_bovada_df()
 
     df = pd.concat([ds_df, bovada_df], ignore_index=True)
+
+    json_file_str = (
+        s3.get_object(Bucket="dylan-andrew-fantasy-project", Key="positions.json")[
+            "Body"
+        ]
+        .read()
+        .decode("utf-8")
+    )
+    json_file = json.loads(json_file_str)
+
+    json_file = update_json(df, json_file)
+    df["position"] = df.player.map(json_file).fillna("Unknown")
+    df.loc[(df.stat == "Sacks") | (df.stat == "Tackles"), "position"] = "Defense"
+
+    s3.put_object(
+        Bucket="dylan-andrew-fantasy-project",
+        Key="positions.json",
+        Body=json.dumps(json_file),
+    )
 
     html = f"""<body><h1>See fantasy data below!!</h1></body>""" + build_table(
         df, color="green_light"
