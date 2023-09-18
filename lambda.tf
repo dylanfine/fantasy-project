@@ -75,7 +75,7 @@ resource "aws_lambda_function" "financial_analysis" {
   runtime          = "python3.8"
   role             = aws_iam_role.lambda_role.arn
   source_code_hash = data.archive_file.zip_lambda.output_base64sha256
-  timeout          = 360
+  timeout          = 600
   layers           = [aws_lambda_layer_version.lambda_layer.arn]
 
   environment {

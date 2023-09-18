@@ -112,8 +112,14 @@ def get_digitalsports_df():
         market_url = f"https://bv2.digitalsportstech.com/api/grouped-markets/v2/categories?sb=bovada&gameId={game_id}&sgmOdds=true"
         res = requests.get(market_url).json()
         over_unders = res["ou"]
+        if "Touchdowns" in res.get("ss", []):
+            over_unders.append("Touchdowns")
         for ou_cat in over_unders:
-            stat_url = f"https://bv2.digitalsportstech.com/api/dfm/marketsByOu?sb=bovada&gameId={game_id}&statistic={urllib.parse.quote(ou_cat)}"
+            if ou_cat == "Touchdowns":
+                # Touchdowns are minimums and not over under
+                stat_url = f"https://bv2.digitalsportstech.com/api/dfm/marketsByss?sb=bovada&gameId={game_id}&statistic={urllib.parse.quote(ou_cat)}"
+            else:
+                stat_url = f"https://bv2.digitalsportstech.com/api/dfm/marketsByOu?sb=bovada&gameId={game_id}&statistic={urllib.parse.quote(ou_cat)}"
             res = requests.get(stat_url).json()
             for player in res[0]["players"]:
                 d = {}
@@ -123,16 +129,20 @@ def get_digitalsports_df():
                 d["game_date"] = extract_date(date)
                 d["stat"] = ou_cat
                 for market in player["markets"]:
+                    # Markets are list of 2 (over/under) for ou and list of ~3 for touchdowns with different totals
                     if market["condition"] == 1:
                         d["under_line"] = market["value"]
                         d["under_odds"] = market["odds"]
                     elif market["condition"] == 3:
                         d["over_line"] = market["value"]
                         d["over_odds"] = market["odds"]
-                lst.append(d)
+                    if ou_cat == "Touchdowns":
+                        lst.append(d.copy())
+                if ou_cat != "Touchdowns":
+                    lst.append(d)
 
-    df = pd.DataFrame(lst)
-    return df
+        df = pd.DataFrame(lst)
+        return df
 
 
 def get_bovada_df():
@@ -154,23 +164,26 @@ def get_bovada_df():
             ]:
                 continue
             for market in display_group["markets"]:
-                market_description = market["description"]
-                stat = market_description.split("-")[0].strip()
-                player = market_description.split("-")[1].strip()
+                try:
+                    market_description = market["description"]
+                    stat = market_description.split("-")[0].strip()
+                    player = market_description.split("-")[1].strip()
 
-                d = {}
-                d["source"] = "bovada"
-                d["game_date"] = str(game_date)
-                d["player"] = player
-                d["stat"] = stat
-                for outcome in market["outcomes"]:
-                    if outcome["description"] == "Over":
-                        d["over_line"] = outcome["price"]["handicap"]
-                        d["over_odds"] = outcome["price"]["decimal"]
-                    elif outcome["description"] == "Under":
-                        d["under_line"] = outcome["price"]["handicap"]
-                        d["under_odds"] = outcome["price"]["decimal"]
-                bovada_lst.append(d)
+                    d = {}
+                    d["source"] = "bovada"
+                    d["game_date"] = str(game_date)
+                    d["player"] = player
+                    d["stat"] = stat
+                    for outcome in market["outcomes"]:
+                        if outcome["description"] == "Over":
+                            d["over_line"] = outcome["price"]["handicap"]
+                            d["over_odds"] = outcome["price"]["decimal"]
+                        elif outcome["description"] == "Under":
+                            d["under_line"] = outcome["price"]["handicap"]
+                            d["under_odds"] = outcome["price"]["decimal"]
+                    bovada_lst.append(d)
+                except:
+                    print(f"Error with {market_description}")
     bovada_df = pd.DataFrame(bovada_lst)
     return bovada_df
 
