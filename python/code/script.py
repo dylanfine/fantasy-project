@@ -141,8 +141,8 @@ def get_digitalsports_df():
                 if ou_cat != "Touchdowns":
                     lst.append(d)
 
-        df = pd.DataFrame(lst)
-        return df
+    df = pd.DataFrame(lst)
+    return df
 
 
 def get_bovada_df():
