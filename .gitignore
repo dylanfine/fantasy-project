@@ -1,3 +1,4 @@
+*.tfvars
 *.idea
 setup/
 nfl_fantasy.ipynb

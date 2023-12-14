@@ -13,6 +13,7 @@ from io import StringIO
 import urllib.parse
 import datetime as dt
 from collections import Counter
+import os
 
 ENDPOINT_URL = "https://www.bovada.lv/services/sports/event/coupon/events/A/description/football/nfl-season-player-props/season-player-specials?marketFilterId=rank&preMatchOnly=true&eventsLimit=5000&lang=en"
 
@@ -45,6 +46,24 @@ desktop
 X-Sport-Context:
 FOOT
 """
+
+
+def get_fun_fact():
+    try:
+        api_key = os.environ["FACTS_API_KEY"]
+        url = "https://facts-by-api-ninjas.p.rapidapi.com/v1/facts"
+
+        headers = {
+            "X-RapidAPI-Key": api_key,
+            "X-RapidAPI-Host": "facts-by-api-ninjas.p.rapidapi.com",
+        }
+
+        response = requests.get(url, headers=headers)
+
+        return response.json()[0]["fact"]
+    except Exception as e:
+        print(f"Facts API error: {e}")
+        return "Facts are broken :("
 
 
 def headers_to_json(headers_string):
@@ -278,7 +297,11 @@ def lambda_handler(event, context):
         Body=json.dumps(json_file),
     )
 
-    html = f"""<body><h1>See fantasy data below!!</h1></body>""" + build_table(
-        df, color="green_light"
+    fun_fact = get_fun_fact()
+    html = (
+        """<body><h1>Daily Fun Fact:</h1>"""
+        + f"""<div style="background-color: #f0e4d7; font-family: 'Comic Sans MS', 'Comic Neue'; text-align: center; padding-top: 50px; width: 60%; margin: auto; padding: 20px; background-color: #fff8dc; border: 2px dashed #ff6347; border-radius: 15px; box-shadow: 0px 0px 10px #888888;"><h1>{fun_fact}</h1></div>"""
+        + """<div><h1>See fantasy data below!!</h1></div>"""
+        + build_table(df.head(100), color="green_light")
     )
     send_dataframe_as_attachment(html, df)

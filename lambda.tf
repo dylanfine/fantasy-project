@@ -67,6 +67,11 @@ resource "aws_lambda_layer_version" "lambda_layer" {
   source_code_hash    = data.aws_s3_object.layers_zip.metadata.Hash
 }
 
+variable "facts_api_key" {
+  description = "The API key for the facts API - held in a .tfvars file"
+  type        = string
+}
+
 resource "aws_lambda_function" "fantasy_project" {
 
   filename         = data.archive_file.zip_lambda.output_path
@@ -82,6 +87,7 @@ resource "aws_lambda_function" "fantasy_project" {
   environment {
     variables = {
       DEV_MODE = "production",
+      FACTS_API_KEY = var.facts_api_key
     }
   }
 }
