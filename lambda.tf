@@ -67,11 +67,12 @@ resource "aws_lambda_layer_version" "lambda_layer" {
   source_code_hash    = data.aws_s3_object.layers_zip.metadata.Hash
 }
 
-resource "aws_lambda_function" "financial_analysis" {
+resource "aws_lambda_function" "fantasy_project" {
 
   filename         = data.archive_file.zip_lambda.output_path
   function_name    = "fantasy_project"
   handler          = "script.lambda_handler"
+  memory_size      = 1028
   runtime          = "python3.8"
   role             = aws_iam_role.lambda_role.arn
   source_code_hash = data.archive_file.zip_lambda.output_base64sha256
@@ -87,13 +88,13 @@ resource "aws_lambda_function" "financial_analysis" {
 
 resource "aws_cloudwatch_event_target" "cloudwatch_to_lambda" {
   rule = aws_cloudwatch_event_rule.daily-cloudwatch.name
-  arn  = aws_lambda_function.financial_analysis.arn
+  arn  = aws_lambda_function.fantasy_project.arn
 
 }
 
 resource "aws_lambda_permission" "cloudwatch-perm" {
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.financial_analysis.function_name
+  function_name = aws_lambda_function.fantasy_project.function_name
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.daily-cloudwatch.arn
 }
