@@ -79,7 +79,11 @@ def headers_to_json(headers_string):
 def send_dataframe_as_attachment(html, df, filename="data.csv"):
     SUBJECT = "Your Daily Fantasy Magic"
     SENDER = "Fantasy Greatness <dylanjfine@gmail.com>"
-    RECEIPEINTS = ["dylanjfine@gmail.com", "andrewboppart@gmail.com"]
+    RECEIPEINTS = [
+        "dylanjfine@gmail.com",
+        "andrewboppart@gmail.com",
+        "basketballozer19@gmail.com",
+    ]
 
     # Convert DataFrame to CSV string
     csv_buffer = StringIO()
